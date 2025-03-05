@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Where is the ISS?</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.3.1/css/ol.css" type="text/css">
+    <script src="https://download.pushtechnology.com/clients/6.11.5/js/diffusion-6.11.5.js"></script>
+    <style>
+        .map {
+          height: 600px;
+          width: 100%;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+</head>
+
+<body>
+
+    <div id="map" class="map"></div>
+
+</body>
+
+<script>
+
+    var map = new ol.Map({
+        target: 'map',
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          })
+        ],
+        view: new ol.View({
+          center: ol.proj.fromLonLat([-0.001545, 51.477928]),
+          zoom: 5
+        })
+      });
+
+    var longitude = "";
+    var latitude = "";
+
+    diffusion.connect({
+    host : "localhost",
+    port : '8080',
+    principal : 'admin',
+    credentials : "password"
+}).then(async function(session) {
+
+    session.addStream("iss/position/longitude",
+                  diffusion.datatypes.get('double')).on('value',
+                  function(topic, specification, newValue, oldValue) {
+                      longitude = newValue;
+    });
+    session.select("iss/position/longitude");
+
+    session.addStream("iss/position/latitude",
+                  diffusion.datatypes.get('double')).on('value',
+                  function(topic, specification, newValue, oldValue) {
+                    latitude = newValue;
+    });
+    session.select("iss/position/latitude");
+
+    while(true){
+        await new Promise(r => setTimeout(r, 2000));
+    
+        map.getView().setCenter(ol.proj.transform([longitude, latitude], 'EPSG:4326', 'EPSG:3857'));
+
+        var marker = new ol.Feature({geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude,latitude])),});
+        var vectorSource = new ol.source.Vector({features: [marker]});
+        var markerVectorLayer = new ol.layer.Vector({source: vectorSource,});
+        map.addLayer(markerVectorLayer);
+        await new Promise(r => setTimeout(r, 2000));
+    }
+});
+
+</script>
+
+</html>
